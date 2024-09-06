@@ -19,7 +19,25 @@ def create_project_spec(project_name):
             "bundleIdPrefix": f"com.example.{project_name.lower()}",
             "deploymentTarget": {
                 "iOS": "14.0"
-            }
+            },
+            "createIntermediateGroups": True,
+            "generateEmptyDirectories": True,
+            "groupSortPosition": "top",
+            "xcodeVersion": "14.0",
+            "groupOrdering": [
+                "README.md",
+                "project.yml"
+            ],
+            "fileGroups": [
+                "README.md",
+                "project.yml"
+            ],
+            "excludedFiles": ["${PROJECT_NAME}.xcodeproj/**"],
+            "transitivelyLinkDependencies": True,
+            "groupOrdering": [
+                "${PROJECT_NAME}",
+                "Packages"
+            ]
         },
         "packages": {
             "Inject": {
@@ -31,7 +49,7 @@ def create_project_spec(project_name):
             project_name: {
                 "type": "application",
                 "platform": "iOS",
-                "sources": ["."],
+                "sources": ["."],  # This ensures all files in the current directory are included
                 "dependencies": [
                     {"package": "Inject"}
                 ],
@@ -62,31 +80,41 @@ def main():
     else:
         project_name = input("Enter the project name: ")
     
-    # Ask for output directory
-    output_dir = input("Enter the output directory (press Enter for default 'output' folder): ").strip()
-    if not output_dir:
-        output_dir = "output"
-    
     # Create output directory
+    output_dir = "./output"
     os.makedirs(output_dir, exist_ok=True)
     
-    # Create project directory inside output directory
+    # Create project directory inside output
     project_path = os.path.join(output_dir, project_name)
     os.makedirs(project_path, exist_ok=True)
     os.chdir(project_path)
+    
+    # Create app directory (this will be the Xcode group)
+    app_dir = project_name
+    os.makedirs(app_dir, exist_ok=True)
     
     # Create project.yml
     spec = create_project_spec(project_name)
     with open("project.yml", "w") as f:
         yaml.dump(spec, f)
+        
+    # Create files in the specified order
+    app_file = f"""
+import SwiftUI
+@_exported import Inject
+
+@main
+struct {project_name}App: App {{
+    var body: some Scene {{
+        WindowGroup {{
+            ContentView()
+        }}
+    }}
+}}
+"""
+    with open(os.path.join(app_dir, f"{project_name}App.swift"), "w") as f:
+        f.write(app_file)
     
-    # Create Assets.xcassets
-    os.makedirs("Assets.xcassets", exist_ok=True)
-    
-    # Create Preview Content
-    os.makedirs("Preview Content/Preview Assets.xcassets", exist_ok=True)
-    
-    # Modify ContentView.swift to include Injection
     content_view = f"""
 import SwiftUI
 import Inject
@@ -100,35 +128,30 @@ struct ContentView: View {{
     }}
 }}
 """
-    with open("ContentView.swift", "w") as f:
+    with open(os.path.join(app_dir, "ContentView.swift"), "w") as f:
         f.write(content_view)
     
-    # Modify App file to include Injection bundle loading
-    app_file = f"""
-import SwiftUI
-@_exported import Inject
-
-@main
-struct {project_name}App: App {{
-    init() {{
-        #if DEBUG
-        Bundle(path: "/Applications/InjectionIII.app/Contents/Resources/iOSInjection.bundle")?.load()
-        #endif`
-    }}
-
-    var body: some Scene {{
-        WindowGroup {{
-            ContentView()
-        }}
-    }}
-}}
-"""
-    with open(f"{project_name}App.swift", "w") as f:
-        f.write(app_file)
+    # Create Assets.xcassets
+    os.makedirs(os.path.join(app_dir, "Assets.xcassets"), exist_ok=True)
     
-    # Create empty Info.plist
-    with open("Info.plist", "w") as f:
+    # Create Preview Content
+    os.makedirs(os.path.join(app_dir, "Preview Content", "Preview Assets.xcassets"), exist_ok=True)
+    
+    # Create empty Info.plist inside app directory
+    with open(os.path.join(app_dir, "Info.plist"), "w") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict/>\n</plist>')
+    
+    # Update project.yml to specify file order and hide Info.plist
+    spec['targets'][project_name]['sources'] = [
+        {'path': os.path.join(app_dir, f"{project_name}App.swift")},
+        {'path': os.path.join(app_dir, "ContentView.swift")},
+        {'path': os.path.join(app_dir, "Assets.xcassets")},
+        {'path': os.path.join(app_dir, "Preview Content")},
+        {'path': os.path.join(app_dir, "Info.plist"), 'type': 'file', 'buildPhase': 'none'}
+    ]
+
+    with open("project.yml", "w") as f:
+        yaml.dump(spec, f)
     
     # Generate Xcode project
     run_command("xcodegen generate")
