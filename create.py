@@ -131,22 +131,10 @@ struct ContentView: View {{
     with open(os.path.join(app_dir, "ContentView.swift"), "w") as f:
         f.write(content_view)
     
-    # Create Assets.xcassets
-    os.makedirs(os.path.join(app_dir, "Assets.xcassets"), exist_ok=True)
-    
-    # Create Preview Content
-    os.makedirs(os.path.join(app_dir, "Preview Content", "Preview Assets.xcassets"), exist_ok=True)
-    
-    # Create empty Info.plist inside app directory
-    with open(os.path.join(app_dir, "Info.plist"), "w") as f:
-        f.write('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict/>\n</plist>')
-    
     # Update project.yml to specify file order and hide Info.plist
     spec['targets'][project_name]['sources'] = [
         {'path': os.path.join(app_dir, f"{project_name}App.swift")},
         {'path': os.path.join(app_dir, "ContentView.swift")},
-        {'path': os.path.join(app_dir, "Assets.xcassets")},
-        {'path': os.path.join(app_dir, "Preview Content")},
         {'path': os.path.join(app_dir, "Info.plist"), 'type': 'file', 'buildPhase': 'none'}
     ]
 
